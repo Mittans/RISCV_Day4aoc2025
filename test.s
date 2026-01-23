@@ -7,12 +7,6 @@ _start:
       # li a2, 13 #how many bytes to write. hardcode it lole
       # li a7, 64 #syscall for write
       # ecall
-      #
-      # li a0, 1
-      # la a1, hello2
-      # li a2, 13
-      # li a7, 64
-      # ecall
 
 _openfile:
         # fd = openat(AT_FDCWD, filename, O_RDONLY, 0)
@@ -26,32 +20,8 @@ _openfile:
         mv      s0, a0              # save the fd
         bltz    s0, _fatal           # if fd < 0 => error
 
-_printmap:
-        #mapFD must be in s0
-        # n = read(fd, buf, 19000)
-        mv      a0, s0  #Move s0 (fd) to a0 arg
-        la      a1, buf #Use the buf as output
-        li      a2, 20000 #Read 19000 bytes in. Day4.txt is 18632 chars
-        li      a7, 63              # __NR_read
-        ecall
-        mv      t0, a0              # n
-        mv      s1, a0  #Save to s1 the map length (important)
-        bltz    a0, _fatal           # error
-
-        # write(fd, buf, n)
-        li      a0, 1               # stdout
-        la      a1, buf
-        mv      a2, t0
-        li      a7, 64              # __NR_write
-        ecall 
-
-_done:
-    # close(fd)
-    mv      a0, s0
-    li      a7, 57              # __NR_close
-    ecall
-
-
+        call _writeBuffer
+        call _printMap
 
         la   t1, buf        # pointer = buf
         li  s2, 0
@@ -84,7 +54,6 @@ _afterWidth:
 #t1 = @
 #t2 = .
 #t3 = ptr
-
 #t6 = curr char
 
   li s5, -1 
@@ -115,7 +84,9 @@ _afterFullScan:
 
 _exit:
         mv a0, s4
-        ebreak
+        call _printMap
+        call _printAnswer
+        #ebreak
         #I can~t return the actual value, cos it's mod % 256~d, lole
         li a7, 93
         ecall
@@ -171,11 +142,10 @@ _afterCheckTop:
 
 
 _afterCheckBot:        
-
   #after everything
   li t0, 4
   bge a0, t0, 1f 
-  #if less the 4 rolls, add  1 to final counter
+  #if less the 4 items, add  1 to final counter
   li t2, 46
   sb t2, 0(t3) #!important stores our byte here
   addi s4, s4, 1
@@ -198,7 +168,6 @@ _checkMid:
 
  1:
   #Check Right next.
-
   addi t2, s3, 2
   remu t0, t2, s2 #if pos+2 % width == 0, right wall, skip 
   beqz t0, 1f #if t0 == 0, right wall = skip
@@ -209,7 +178,6 @@ _checkMid:
   addi a0, a0, 1 #if == '@', add 1 to a0
 1:
   ret
-
 
 
 _checkTop:
@@ -262,31 +230,98 @@ _checkBot:
   bne a2, t1, 1f #if not != '@', skip
   addi a0, a0, 1 #if == '@', add 1 to a0
 1:
-  #bot left checked. now need to check if top right is valid
+  #bot left checked. now need to check if bot right is valid
   addi t2, s3, 2
   remu t0, t2, s2 #if pos+2 % width == 0, right wall, skip 
   beqz t0, 1f #if t0 == 0, right wall = skip
   
-  add a2, t3, s2 #otherwise move pointer. Subtract width to get row above
+  add a2, t3, s2 #otherwise move pointer. Subtract width to get row below
   addi a2, a2, 1 #then add 1 to get bot left
   lbu a2, 0(a2) #load byte at address
   bne a2, t1, 1f #if not != '@', skip
   addi a0, a0, 1 #if == '@', add 1 to a0
 1:
   ret
-#Check top left next. Need to check if left wall
 
-#Check top right last. Need to chek if right wall
 
+_writeBuffer:
+        
+        #mapFD must be in s0
+        # n = read(fd, buf, 19000)
+        mv      a0, s0  #Move s0 (fd) to a0 arg
+        la      a1, buf #Use the buf as output
+        li      a2, 20000 #Read 19000 bytes in. Day4.txt is 18632 chars
+        li      a7, 63              # __NR_read
+        ecall
+        mv      t0, a0              # n
+        mv      s1, a0  #Save to s1 the map length (important)
+        bltz    a0, _fatal           # error
+
+_done:
+    # close(fd)
+    mv      a0, s0
+    li      a7, 57              # __NR_close
+    ecall
+
+ret
+
+_printMap:
+
+        # write(fd, buf, n)
+        li      a0, 0               # stdout
+        la      a1, buf
+        mv      a2, s1
+        li      a7, 64              # __NR_write
+        ecall 
+
+  ret
+
+_printAnswer:
+  #s4 holds the ANSWER
+        li      a0, 1               # stdout
+        la      a1, answer 
+        li      a2, 19
+        li      a7, 64              # __NR_write
+        ecall 
+
+  #itoa from here: https://github.com/mathsDOTearth/RISCVintout/blob/main/intout.s
+    #la sp, stack  # set stack pointer
+   mv a4, sp # set address of stack to a4
+   li a2, 10     # load constant for division
+   mv a0, s4# load integer to print
+
+convert_loop:
+  rem a3, a0, a2     # get remainder
+  addi a3, a3, 48    # convert to ascii
+  addi sp, sp, -1    # decrement stack pointer
+  sb a3, 0(sp)       # store in stack
+  div a0, a0, a2     # divide by 10
+  bnez a0, convert_loop # loop until a0 is zero
+
+  li  a0, 1      # 1 = StdOut
+  #addi  sp, sp, 1      # increment stack pointer to point to the start of the string
+  mv    a1, sp         # copy stack pointer to a1
+  sub   a2, a4, sp     # calculate length of string
+  #slli  a2, a2, 2      # multiply length by 4
+  li  a7, 64     # linux write system call
+  ecall                # Call linux to output the string
+
+  li  a0, 1      # 1 = StdOut
+  la    a1, newline    # load address of helloworld
+  li  a2, 1      # length of our string
+  li  a7, 64     # linux write system call
+  ecall                # Call linux to output the string
+
+  ret
 
 
 .section .rodata
-hello: .asciz "Hello World!\n"
-hello2: .asciz "Hello World2\n"
-inputfile: .asciz "day4sample.txt"
+answer: .asciz "\nFinal answer was: "
+inputfile: .asciz "day4.txt"
+newline: .asciz "\n"
 
-        .section .bss
-        .align 8
+  .section .bss
+  .align 4
 buf:
         .skip 20000
 
