@@ -70,9 +70,9 @@ _getwidth: #we need a map width for da convolution. save in s2
 #WIDTH IS SAVED IN S2
 _afterWidth:
         addi s2, s2, 1
-        li s3, 0
+        #li s3, 0
         li s4, 0
-        la t3, buf
+        #la t3, buf
 
 #S3 is our position in the buffer. Need to loop through char by char
 #S4 is our counter. Holds the final answer.
@@ -90,7 +90,9 @@ _afterWidth:
   li s5, -1 
 _theloop:
   la t3, buf 
-
+  beq s5, s4, _exit
+  mv s5, s4
+  li s3, 0
 
 _processMap:
         li t0, 10 #t0 == \n
@@ -98,7 +100,7 @@ _processMap:
         li t2, 46 #t2 == .
         lbu t6, 0(t3) #t6 == load char
         #addi t3, t3, 1 was moved from here. Won''t it mess up the pointer too early?
-        beq t6, x0, _exit #is char null terminated? then exit
+        beq t6, x0, _afterFullScan #is char null terminated? then exit
         bne t6, t1, _processCleanup #is t6 != @? if nup, skip
         call _processChar #otherwise, process the @ char
 
@@ -107,6 +109,9 @@ _processCleanup:
         addi t3, t3, 1 #move t3 next post
         j _processMap
 
+_afterFullScan:
+  j _theloop
+  
 
 _exit:
         mv a0, s4
@@ -120,12 +125,9 @@ _fatal:
         li a7, 93
         ecall
 
-_coolcall:
-        add a0, a0, 56
-        ret
 
 _processChar:
-#Ok chud, you're guaranateed to be on an @ character
+#Ok chud, you~re guaranateed to be on an @ character:
 #s1 is length
 #S2 is your width
 #S3 is your pos
@@ -173,6 +175,9 @@ _afterCheckBot:
   #after everything
   li t0, 4
   bge a0, t0, 1f 
+  #if less the 4 rolls, add  1 to final counter
+  li t2, 46
+  sb t2, 0(t3) #!important stores our byte here
   addi s4, s4, 1
 
 1:
