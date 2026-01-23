@@ -2,47 +2,44 @@
 
 .section .text
 _start:
-      # li a0, 1 #fd to write to. 1 is stdout
-      # la a1, hello #address to write. Needs 0 terminated
-      # li a2, 13 #how many bytes to write. hardcode it lole
-      # li a7, 64 #syscall for write
-      # ecall
+#Program START
 
 _openfile:
-        # fd = openat(AT_FDCWD, filename, O_RDONLY, 0)
-        # fd <0 is bad
-        li      a0, -100 # AT_FDCWD is a magic number. -100 means read from relative path
-        la      a1, inputfile # pathname. Either day4sample.txt or day4.txt
-        li      a2, 0               # O_RDONLY magic value is 0 (only read, what we want)
-        li      a3, 0               # mode? No idea, just leave at 0
-        li      a7, 56              # syscall for openat()
-        ecall
-        mv      s0, a0              # save the fd
-        bltz    s0, _fatal           # if fd < 0 => error
+# fd = openat(AT_FDCWD, filename, O_RDONLY, 0)
+# fd <0 is bad
+    li      a0, -100 # AT_FDCWD is a magic number. -100 means read from relative path
+    la      a1, inputfile # pathname. Either day4sample.txt or day4.txt
+    li      a2, 0               # O_RDONLY magic value is 0 (only read, what we want)
+    li      a3, 0               # mode? No idea, just leave at 0
+    li      a7, 56              # syscall for openat()
+    ecall
+    mv      s0, a0              # save the fd
+    bltz    s0, _fatal           # if fd < 0 => error
 
-        call _writeBuffer
-        call _printMap
+    call _writeBuffer
+    call _printMap
 
-        la   t1, buf        # pointer = buf
-        li  s2, 0
-        li t3, 10
+    la   t1, buf        # pointer = buf
+    li  s2, 0
+    li t3, 10
 
 #AT THIS POINT THE MAP IS LOADED
 #THE FULL LENGTH IS SAVED IN S1
 _getwidth: #we need a map width for da convolution. save in s2
-        lbu  t2, 0(t1)            # load byte (unsigned char)
-        beq  t2, t3, _afterWidth   # while (ptr != end)
-        addi s2, s2,  1
-        addi t1, t1, 1
-        j _getwidth
+    lbu  t2, 0(t1)            # load byte (unsigned char)
+    beq  t2, t3, _afterWidth   # while (ptr != end)
+    addi s2, s2,  1
+    addi t1, t1, 1
+    j _getwidth
 
 #AT THIS POINT THE WIDTH IS KNOWN
 #WIDTH IS SAVED IN S2
 _afterWidth:
-        addi s2, s2, 1
-        #li s3, 0
-        li s4, 0
-        #la t3, buf
+    addi s2, s2, 1
+    #li s3, 0
+    li s4, 0
+    li s5, -1 
+    #la t3, buf
 
 #S3 is our position in the buffer. Need to loop through char by char
 #S4 is our counter. Holds the final answer.
@@ -55,46 +52,46 @@ _afterWidth:
 #t2 = .
 #t3 = ptr
 #t6 = curr char
+    
 
-  li s5, -1 
 _theloop:
-  la t3, buf 
-  beq s5, s4, _exit
-  mv s5, s4
-  li s3, 0
+    la t3, buf 
+    beq s5, s4, _exit
+    mv s5, s4
+    li s3, 0
 
 _processMap:
-        li t0, 10 #t0 == \n
-        li t1, 64 #t1 == @
-        li t2, 46 #t2 == .
-        lbu t6, 0(t3) #t6 == load char
-        #addi t3, t3, 1 was moved from here. Won''t it mess up the pointer too early?
-        beq t6, x0, _afterFullScan #is char null terminated? then exit
-        bne t6, t1, _processCleanup #is t6 != @? if nup, skip
-        call _processChar #otherwise, process the @ char
+    li t0, 10 #t0 == \n
+    li t1, 64 #t1 == @
+    li t2, 46 #t2 == .
+    lbu t6, 0(t3) #t6 == load char
+#addi t3, t3, 1 was moved from here. Won''t it mess up the pointer too early?
+    beq t6, x0, _afterFullScan #is char null terminated? then exit
+    bne t6, t1, _processCleanup #is t6 != @? if nup, skip
+    call _processChar #otherwise, process the @ char
 
 _processCleanup:
-        addi s3, s3, 1 #add 1 to pos
-        addi t3, t3, 1 #move t3 next post
-        j _processMap
+    addi s3, s3, 1 #add 1 to pos
+    addi t3, t3, 1 #move t3 next post
+    j _processMap
 
 _afterFullScan:
-  j _theloop
+    j _theloop
   
 
 _exit:
-        mv a0, s4
-        call _printMap
-        call _printAnswer
-        #ebreak
-        #I can~t return the actual value, cos it's mod % 256~d, lole
-        li a7, 93
-        ecall
+    mv a0, s4
+    call _printMap #print the map again after we're all done
+    call _printAnswer #print the answer with an itoa method
+    #ebreak
+    li a7, 93
+    ecall
+
 
 _fatal:
-        neg a0, a0
-        li a7, 93
-        ecall
+    li a1, 1 #something bad happened
+    li a7, 93
+    ecall
 
 
 _processChar:
@@ -116,25 +113,23 @@ _processChar:
 #a0 will contain number of @''s counted
 #a1 is free. Store prev ra here?
 
-        #remu t0, s3, s2
-        # Eg. Width is 4 here
-        #0 1 2 \n
-        #@ 5 6 \n 
-        #. . . \n
+    #remu t0, s3, s2
+    # Eg. Width is 4 here
+    #0 1 2 \n
+    #@ 5 6 \n 
+    #. . . \n
+    mv a1, ra
+    addi t0, s3, 1
+    bge s2, t0, _afterCheckTop 
+    call _checkTop
 
-        mv a1, ra
-        addi t0, s3, 1
-        bge s2, t0, _afterCheckTop 
-        call _checkTop
 
 _afterCheckTop:
      # middle check is always valid 
-  call _checkMid
-    
+    call _checkMid
     # after mid check, time to check the bottom 
     # pos s3, len == s1
     # s3 + width > length
-
     add t0, s3, s2
     addi t0, t0, +1
     blt s1, t0, _afterCheckBot
@@ -142,186 +137,184 @@ _afterCheckTop:
 
 
 _afterCheckBot:        
-  #after everything
-  li t0, 4
-  bge a0, t0, 1f 
-  #if less the 4 items, add  1 to final counter
-  li t2, 46
-  sb t2, 0(t3) #!important stores our byte here
-  addi s4, s4, 1
+    #after everything
+    li t0, 4
+    bge a0, t0, 1f 
+    #if less the 4 items, add  1 to final counter
+    li t2, 46
+    sb t2, 0(t3) #!important stores our byte here
+    addi s4, s4, 1
 
 1:
-  li a0, 0
-  mv ra, a1
+    li a0, 0
+    mv ra, a1
   ret
 
 
 _checkMid:
   #Check Left first.
-  remu t0, s3, s2 #if pos % width == 0, left wall, skip 
-  beqz t0, 1f #if t0 == 0, left wall = skip
- 
-  addi a2, t3, -1 #then subtract 1 to get topleft
-  lbu a2, 0(a2) #load byte at address
-  bne a2, t1, 1f #if not != '@', skip
-  addi a0, a0, 1 #if == '@', add 1 to a0
+    remu t0, s3, s2 #if pos % width == 0, left wall, skip 
+    beqz t0, 1f #if t0 == 0, left wall = skip
+  
+    addi a2, t3, -1 #then subtract 1 to get topleft
+    lbu a2, 0(a2) #load byte at address
+    bne a2, t1, 1f #if not != '@', skip
+    addi a0, a0, 1 #if == '@', add 1 to a0
 
  1:
-  #Check Right next.
-  addi t2, s3, 2
-  remu t0, t2, s2 #if pos+2 % width == 0, right wall, skip 
-  beqz t0, 1f #if t0 == 0, right wall = skip
-  
-  addi a2, t3, 1 #then add 1 to get topleft
-  lbu a2, 0(a2) #load byte at address
-  bne a2, t1, 1f #if not != '@', skip
-  addi a0, a0, 1 #if == '@', add 1 to a0
+#Check Right next.
+    addi t2, s3, 2
+    remu t0, t2, s2 #if pos+2 % width == 0, right wall, skip 
+    beqz t0, 1f #if t0 == 0, right wall = skip
+
+    addi a2, t3, 1 #then add 1 to get topleft
+    lbu a2, 0(a2) #load byte at address
+    bne a2, t1, 1f #if not != '@', skip
+    addi a0, a0, 1 #if == '@', add 1 to a0
+
 1:
   ret
 
 
 _checkTop:
- #Check top centre first. Always valid if top is valid 
-  sub a2, t3, s2 #Subtract width from pos 
-  lbu a2, 0(a2) #load character at (pos - width) 
-  bne a2, t1, 1f #if t1 (@) != char at (pos - width), skip
-  addi a0, a0, 1
+  #Check top centre first. Always valid if top is valid 
+    sub a2, t3, s2 #Subtract width from pos 
+    lbu a2, 0(a2) #load character at (pos - width) 
+    bne a2, t1, 1f #if t1 (@) != char at (pos - width), skip
+    addi a0, a0, 1
 
 1:
- #top checked. now need to check if top left is valid 
-  remu t0, s3, s2 #if pos % width == 0, left wall, skip 
-  beqz t0, 1f #if t0 == 0, left wall = skip
-  
-  sub a2, t3, s2 #otherwise move pointer. Subtract width to get row above
-  addi a2, a2, -1 #then subtract 1 to get topleft
-  lbu a2, 0(a2) #load byte at address
-  bne a2, t1, 1f #if not != '@', skip
-  addi a0, a0, 1 #if == '@', add 1 to a0
+  #top checked. now need to check if top left is valid 
+    remu t0, s3, s2 #if pos % width == 0, left wall, skip 
+    beqz t0, 1f #if t0 == 0, left wall = skip
+    
+    sub a2, t3, s2 #otherwise move pointer. Subtract width to get row above
+    addi a2, a2, -1 #then subtract 1 to get topleft
+    lbu a2, 0(a2) #load byte at address
+    bne a2, t1, 1f #if not != '@', skip
+    addi a0, a0, 1 #if == '@', add 1 to a0
+
 1:
-  #top left checked. now need to check if topright is valid
-  addi t2, s3, 2
-  remu t0, t2, s2 #if pos+2 % width == 0, right wall, skip 
-  beqz t0, 1f #if t0 == 0, right wall = skip
-  
-  sub a2, t3, s2 #otherwise move pointer. Subtract width to get row above
-  addi a2, a2, 1 #then add 1 to get topleft
-  lbu a2, 0(a2) #load byte at address
-  bne a2, t1, 1f #if not != '@', skip
-  addi a0, a0, 1 #if == '@', add 1 to a0
+    #top left checked. now need to check if topright is valid
+    addi t2, s3, 2
+    remu t0, t2, s2 #if pos+2 % width == 0, right wall, skip 
+    beqz t0, 1f #if t0 == 0, right wall = skip
+    
+    sub a2, t3, s2 #otherwise move pointer. Subtract width to get row above
+    addi a2, a2, 1 #then add 1 to get topleft
+    lbu a2, 0(a2) #load byte at address
+    bne a2, t1, 1f #if not != '@', skip
+    addi a0, a0, 1 #if == '@', add 1 to a0
+
 1:
   ret
 
-
 _checkBot:
- #Check bot centre first. Always valid if bot is valid 
-  add a2, t3, s2 #Subtract width from pos 
-  lbu a2, 0(a2) #load character at (pos - width) 
-  bne a2, t1, 1f #if t1 (@) != char at (pos - width), skip
-  addi a0, a0, 1
+  #Check bot centre first. Always valid if bot is valid 
+    add a2, t3, s2 #Subtract width from pos 
+    lbu a2, 0(a2) #load character at (pos - width) 
+    bne a2, t1, 1f #if t1 (@) != char at (pos - width), skip
+    addi a0, a0, 1
 
 1:
- #bot checked. now need to check if bot left is valid 
-  remu t0, s3, s2 #if pos % width == 0, left wall, skip 
-  beqz t0, 1f #if t0 == 0, left wall = skip
-  
-  add a2, t3, s2 #otherwise move pointer. Subtract width to get row above
-  addi a2, a2, -1 #then subtract 1 to get botleft
-  lbu a2, 0(a2) #load byte at address
-  bne a2, t1, 1f #if not != '@', skip
-  addi a0, a0, 1 #if == '@', add 1 to a0
+  #bot checked. now need to check if bot left is valid 
+    remu t0, s3, s2 #if pos % width == 0, left wall, skip 
+    beqz t0, 1f #if t0 == 0, left wall = skip
+    
+    add a2, t3, s2 #otherwise move pointer. Subtract width to get row above
+    addi a2, a2, -1 #then subtract 1 to get botleft
+    lbu a2, 0(a2) #load byte at address
+    bne a2, t1, 1f #if not != '@', skip
+    addi a0, a0, 1 #if == '@', add 1 to a0
+
 1:
-  #bot left checked. now need to check if bot right is valid
-  addi t2, s3, 2
-  remu t0, t2, s2 #if pos+2 % width == 0, right wall, skip 
-  beqz t0, 1f #if t0 == 0, right wall = skip
-  
-  add a2, t3, s2 #otherwise move pointer. Subtract width to get row below
-  addi a2, a2, 1 #then add 1 to get bot left
-  lbu a2, 0(a2) #load byte at address
-  bne a2, t1, 1f #if not != '@', skip
-  addi a0, a0, 1 #if == '@', add 1 to a0
+    #bot left checked. now need to check if bot right is valid
+    addi t2, s3, 2
+    remu t0, t2, s2 #if pos+2 % width == 0, right wall, skip 
+    beqz t0, 1f #if t0 == 0, right wall = skip
+    
+    add a2, t3, s2 #otherwise move pointer. Subtract width to get row below
+    addi a2, a2, 1 #then add 1 to get bot left
+    lbu a2, 0(a2) #load byte at address
+    bne a2, t1, 1f #if not != '@', skip
+    addi a0, a0, 1 #if == '@', add 1 to a0
+
 1:
   ret
 
 
 _writeBuffer:
-        
-        #mapFD must be in s0
-        # n = read(fd, buf, 19000)
-        mv      a0, s0  #Move s0 (fd) to a0 arg
-        la      a1, buf #Use the buf as output
-        li      a2, 20000 #Read 19000 bytes in. Day4.txt is 18632 chars
-        li      a7, 63              # __NR_read
-        ecall
-        mv      t0, a0              # n
-        mv      s1, a0  #Save to s1 the map length (important)
-        bltz    a0, _fatal           # error
+#mapFD must be in s0
+# n = read(fd, buf, 19000)
+    mv      a0, s0  #Move s0 (fd) to a0 arg
+    la      a1, buf #Use the buf as output
+    li      a2, 20000 #Read 19000 bytes in. Day4.txt is 18632 chars
+    li      a7, 63              # __NR_read
+    ecall
+    mv      t0, a0              # n
+    mv      s1, a0  #Save to s1 the map length (important)
+    bltz    a0, _fatal           # error
 
 _done:
-    # close(fd)
-    mv      a0, s0
-    li      a7, 57              # __NR_close
-    ecall
-
+# close(fd)
+  mv      a0, s0
+  li      a7, 57              # __NR_close
+  ecall
 ret
 
 _printMap:
-
-        # write(fd, buf, n)
-        li      a0, 0               # stdout
-        la      a1, buf
-        mv      a2, s1
-        li      a7, 64              # __NR_write
-        ecall 
-
+    # write(fd, buf, n)
+    li      a0, 0               # stdout
+    la      a1, buf
+    mv      a2, s1
+    li      a7, 64              # __NR_write
+    ecall 
   ret
 
 _printAnswer:
   #s4 holds the ANSWER
-        li      a0, 1               # stdout
-        la      a1, answer 
-        li      a2, 19
-        li      a7, 64              # __NR_write
-        ecall 
+    li      a0, 1               # stdout
+    la      a1, answer 
+    li      a2, 19
+    li      a7, 64              # __NR_write
+    ecall 
 
-  #itoa from here: https://github.com/mathsDOTearth/RISCVintout/blob/main/intout.s
-    #la sp, stack  # set stack pointer
-   mv a4, sp # set address of stack to a4
-   li a2, 10     # load constant for division
-   mv a0, s4# load integer to print
+#itoa based in this: https://github.com/mathsDOTearth/RISCVintout/blob/main/intout.s
+#but i use da real stack instead
+    mv a4, sp # set address of stack to a4
+    li a2, 10     # load constant for division
+    mv a0, s4# load integer to print
 
 convert_loop:
-  rem a3, a0, a2     # get remainder
-  addi a3, a3, 48    # convert to ascii
-  addi sp, sp, -1    # decrement stack pointer
-  sb a3, 0(sp)       # store in stack
-  div a0, a0, a2     # divide by 10
-  bnez a0, convert_loop # loop until a0 is zero
+    rem a3, a0, a2     # get remainder
+    addi a3, a3, 48    # convert to ascii
+    addi sp, sp, -1    # decrement stack pointer
+    sb a3, 0(sp)       # store in stack
+    div a0, a0, a2     # divide by 10
+    bnez a0, convert_loop # loop until a0 is zero
 
-  li  a0, 1      # 1 = StdOut
-  #addi  sp, sp, 1      # increment stack pointer to point to the start of the string
-  mv    a1, sp         # copy stack pointer to a1
-  sub   a2, a4, sp     # calculate length of string
-  #slli  a2, a2, 2      # multiply length by 4
-  li  a7, 64     # linux write system call
-  ecall                # Call linux to output the string
+    li  a0, 1      # 1 = StdOut
+    mv    a1, sp         # copy stack pointer to a1
+    sub   a2, a4, sp     # calculate length of string
+    li  a7, 64     # linux write system call
+    ecall                # Call linux to output the string
 
-  li  a0, 1      # 1 = StdOut
-  la    a1, newline    # load address of helloworld
-  li  a2, 1      # length of our string
-  li  a7, 64     # linux write system call
-  ecall                # Call linux to output the string
+    li  a0, 1      # 1 = StdOut
+    la    a1, newline    # load address of helloworld
+    li  a2, 1      # length of our string
+    li  a7, 64     # linux write system call
+    ecall                # Call linux to output the string
 
   ret
 
 
 .section .rodata
-answer: .asciz "\nFinal answer was: "
+  answer: .asciz "\nFinal answer was: "
 inputfile: .asciz "day4.txt"
-newline: .asciz "\n"
+  newline: .asciz "\n"
 
-  .section .bss
-  .align 4
-buf:
-        .skip 20000
+.section .bss
+.align 4
+  buf:
+    .skip 20000
 
