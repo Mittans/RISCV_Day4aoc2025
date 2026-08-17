@@ -1,0 +1,22 @@
+name: Build and Check
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: cachix/install-nix-action@v31
+      - uses: Mic92/hestia@v3
+
+      - name: Build RISC-V Binary
+        run: nix develop --command sh -c "cmake -B build && cmake --build build --verbose"
+
+      - name: Run Test
+        run: nix develop --command qemu-riscv64 build/test day4sample.txt
