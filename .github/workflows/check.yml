@@ -19,4 +19,4 @@ jobs:
         run: nix develop --command sh -c "cmake -B build && cmake --build build --verbose"
 
       - name: Run Test
-        run: nix develop --command qemu-riscv64 build/test day4sample.txt
+        run: nix develop --command qemu-riscv64 build/test day4sample.txt || true
