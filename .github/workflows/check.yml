@@ -19,7 +19,7 @@ jobs:
         run: nix develop --command sh -c "cmake -B build && cmake --build build --verbose"
 
       - name: Run Test
-        run: nix develop --command qemu-riscv64 build/test day4sample.txt || true
+        run: nix develop --command qemu-riscv64 build/test day4sample.txt
 
   check-with-ubuntu:
     runs-on: ubuntu-latest
@@ -40,7 +40,7 @@ jobs:
         run: cmake -B build && cmake --build build --verbose
 
       - name: Run Test
-        run: qemu-riscv64 build/test day4sample.txt || true
+        run: qemu-riscv64 build/test day4sample.txt
 
   check-with-docker:
     runs-on: ubuntu-latest
@@ -57,7 +57,7 @@ jobs:
         uses: docker://multiarch/qemu-user-static:latest
         with:
           entrypoint: sh
-          args: -c "qemu-riscv64-static build/test day4sample.txt > test_output.log 2>&1 || true"
+          args: -c "qemu-riscv64-static build/test day4sample.txt > test_output.log 2>&1"
 
       - name: Echo test output (in Alpine container)
         uses: docker://alpine:latest
