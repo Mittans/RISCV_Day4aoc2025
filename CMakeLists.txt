@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.10)
 project(RiscV_Test LANGUAGES NONE)
 
-find_program(RISCV_AS NAMES riscv64-elf-as riscv64-none-elf-as REQUIRED)
-find_program(RISCV_LD NAMES riscv64-elf-ld riscv64-none-elf-ld REQUIRED)
+find_program(RISCV_AS NAMES riscv64-unknown-elf-as riscv64-linux-gnu-as riscv64-none-elf-as riscv64-elf-as)
+find_program(RISCV_LD NAMES riscv64-unknown-elf-ld riscv64-linux-gnu-ld riscv64-none-elf-ld riscv64-elf-ld)
 
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test.o
