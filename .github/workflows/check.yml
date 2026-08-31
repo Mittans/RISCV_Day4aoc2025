@@ -43,3 +43,28 @@ jobs:
 
       - name: Run Test
         run: qemu-riscv64 build/test day4sample.txt || true
+
+  check-with-docker-chain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate Makefile (in CMake container)
+        uses: docker://kitware/cmake:latest
+        with:
+          args: cmake -B build -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+
+      - name: Build Binary (in Clang container)
+        uses: docker://silkeh/clang:latest
+        with:
+          args: make -C build VERBOSE=1
+
+      - name: Run Test and save output (in QEMU container)
+        uses: docker://multiarch/qemu-user-static:latest
+        with:
+          args: sh -c "qemu-riscv64-static build/test day4sample.txt > test_output.log 2>&1 || true"
+
+      - name: Echo test output (in Alpine container)
+        uses: docker://alpine:latest
+        with:
+          args: sh -c "echo '--- TEST RESULTS ---' && cat test_output.log"
