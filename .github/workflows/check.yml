@@ -3,12 +3,12 @@ name: Build and Check
 on:
   workflow_dispatch:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
-  check:
+  check-with-nix:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -19,4 +19,48 @@ jobs:
         run: nix develop --command sh -c "cmake -B build && cmake --build build --verbose"
 
       - name: Run Test
-        run: nix develop --command qemu-riscv64 build/test day4sample.txt || true
+        run: nix develop --command qemu-riscv64 build/test day4sample.txt
+
+  check-with-ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Dependencies via apt
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            clang \
+            binutils-riscv64-unknown-elf \
+            qemu-user \
+            make
+
+      - name: Build RISC-V Binary
+        run: cmake -B build && cmake --build build --verbose
+
+      - name: Run Test
+        run: qemu-riscv64 build/test day4sample.txt
+
+  check-with-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate and Build Binary (in Clang container)
+        uses: docker://silkeh/clang:latest
+        with:
+          entrypoint: sh
+          # Install cmake here so the Makefile's `cmake -E` commands can execute, then build
+          args: -c "apt-get update && apt-get install -y cmake make binutils-riscv64-unknown-elf && cmake -S . -B build -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ && make -C build VERBOSE=1"
+      - name: Run Test and save output (in QEMU container)
+        uses: docker://multiarch/qemu-user-static:latest
+        with:
+          entrypoint: sh
+          args: -c "qemu-riscv64-static build/test day4sample.txt > test_output.log 2>&1"
+
+      - name: Echo test output (in Alpine container)
+        uses: docker://alpine:latest
+        with:
+          entrypoint: sh
+          args: -c "echo '--- TEST RESULTS ---' && cat test_output.log"
